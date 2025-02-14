@@ -1,0 +1,83 @@
+// Load Department Data
+CALL {
+LOAD CSV WITH HEADERS FROM 'file:///department.csv' AS row
+WITH row WHERE row.Dept_Id IS NOT NULL
+MERGE (d:Department {id: row.Dept_Id})
+SET d.name = row.Dept_Name,
+    d.dept_location = row.Dept_Location
+}
+
+// Load DepartmentAdmin Data
+CALL {
+LOAD CSV WITH HEADERS FROM 'file:///departmentadmin.csv' AS admin_row
+WITH admin_row WHERE admin_row.Admin_Id IS NOT NULL
+MERGE (a:Dept_Admin {id: admin_row.Admin_Id})
+SET a.name = admin_row.Admin_Name,
+    a.dept_id = admin_row.Dept_Id
+}
+
+// Load NonResidentAlien Data
+CALL {
+LOAD CSV WITH HEADERS FROM 'file:///nonresidentalien.csv' AS nra_row
+WITH nra_row WHERE nra_row.NRA_Id IS NOT NULL
+MERGE (n:NRA {id: nra_row.NRA_Id}) 
+SET n.ssn = nra_row.SSN,
+    n.is_ssn_temp = toBoolean(nra_row.is_SSN_Temp),
+    n.tax_treaty_id = nra_row.Tax_Treaty_Id,
+    n.first_name = nra_row.First_Name,
+    n.middle_name = nra_row.Middle_Name,
+    n.last_name = nra_row.Last_Name,
+    n.gender = nra_row.Gender,
+    n.birthdate = date(nra_row.Birthdate),
+    n.passport_no = nra_row.Passport_No,
+    n.i94_status = nra_row.I_94_Status,
+    n.visa_no = nra_row.Visa_Number,
+    n.visa_type = nra_row.Visa_Type,
+    n.visa_exp_date = date(nra_row.Visa_Expiration_Date),
+    n.nationality = nra_row.Nationality
+}
+
+// Load Payment Data
+CALL {
+LOAD CSV WITH HEADERS FROM 'file:///payment.csv' AS pay_row
+WITH pay_row WHERE pay_row.Payment_ID IS NOT NULL
+MERGE (p:Payment {id: pay_row.Payment_ID})
+SET p.payee_id = pay_row.Payee_Id,
+    p.approver_id = pay_row.Approver_Id,
+    p.pay_date = date(pay_row.Payment_Date),
+    p.gross_pay = toFloat(pay_row.Gross_Pay),
+    p.net_pay = toFloat(pay_row.Net_Pay),
+    p.deductions = toFloat(pay_row.Deductions),
+    p.pay_type = pay_row.Payment_type,
+    p.acc_no = pay_row.Account_No,
+    p.routing_no = pay_row.Routing_No
+}
+
+// Create "PART_OF" relationship between NRAs and Department
+CALL {
+    LOAD CSV WITH HEADERS FROM 'file:///partof.csv' AS partof_row
+    WITH partof_row WHERE partof_row.NRA_ID IS NOT NULL AND partof_row.Dept_ID IS NOT NULL
+    MATCH (n:NRA {id: partof_row.NRA_ID})
+    MATCH (d:Department {id: partof_row.Dept_ID})
+    MERGE (n)-[:PART_OF]->(d)
+}
+
+// Create "SUPERVISES" relationship between Dept_Admin and Department
+CALL {
+LOAD CSV WITH HEADERS FROM 'file:///departmentadmin.csv' AS admin_row
+WITH admin_row WHERE admin_row.Admin_Id IS NOT NULL
+MATCH (a:Dept_Admin {id: admin_row.Admin_Id})
+MATCH (d:Department {id: admin_row.Dept_Id})
+MERGE (a)-[:SUPERVISES]->(d)
+}
+
+// Create "RECIEVES" relationship between NRA & Payment and "APPROVES" relationship between Dept_Admin & Payment
+CALL {
+LOAD CSV WITH HEADERS FROM 'file:///payment.csv' AS pay_row
+WITH pay_row WHERE pay_row.Payment_ID IS NOT NULL
+MATCH (n:NRA {id: pay_row.Payee_Id})
+MATCH (p:Payment {id: pay_row.Payment_ID})
+MATCH (a:Dept_Admin {id: pay_row.Approver_Id})
+MERGE (n)-[:RECIEVES]->(p)
+MERGE (a)-[:APPROVES]->(p)
+}

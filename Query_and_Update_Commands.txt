@@ -1,0 +1,121 @@
+// STEP 1: Create new nodes 
+CREATE (d:Department {
+  id: "D006",
+  name: "Marketing",
+  dept_location: "Building F"
+})
+CREATE (a:Dept_Admin {
+  id: "A007",
+  name: "Sarah Johnson",
+  dept_id: "D006"
+})
+CREATE (n:NRA {
+  id: "N021",
+  ssn: "987-65-4321",
+  is_ssn_temp: false,
+  tax_treaty_id: "T006",
+  first_name: "Alex",
+  last_name: "Wong",
+  gender: "M",
+  birthdate: date("1988-07-15"),
+  passport_no: "P9876543",
+  i94_status: "H1B",
+  visa_type: "Work",
+  nationality: "Singaporean"
+})
+CREATE (p:Payment {
+  id: "P051",
+  payee_id: "N021",
+  approver_id: "A007",
+  pay_date: date("2024-11-21"),
+  gross_pay: 6000.00,
+  net_pay: 5200.00,
+  deductions: 800.00,
+  pay_type: "Salary",
+  acc_no: "ACC98765",
+  routing_no: "ROUT9876"
+})
+
+
+// STEP 2: Create relationships
+MATCH (d:Department {id: "D006"})
+MATCH (a:Dept_Admin {id: "A007"})
+MATCH (n:NRA {id: "N021"})
+MATCH (p:Payment {id: "P051"})
+MERGE (a)-[:SUPERVISES]->(d)
+MERGE (n)-[:PART_OF]->(d)
+MERGE (n)-[:RECIEVES]->(p)
+MERGE (a)-[:APPROVES]->(p)
+
+
+// STEP 3: Removing the newly created nodes
+MATCH (d:Department {id: "D006"})
+MATCH (a:Dept_Admin {id: "A007"})
+MATCH (n:NRA {id: "N021"})
+MATCH (p:Payment {id: "P051"})
+DETACH DELETE d, a, n, p
+
+
+// STEP 4: Removing NRA nodes from the database which neither have a department nor have any payment linked to it
+MATCH (n:NRA)
+WHERE NOT (n)-[:PART_OF]->(:Department)
+  AND NOT (n)-[:RECIEVES]->(:Payment)
+DETACH DELETE n
+
+
+
+
+
+// Q1: List all non-resident aliens along with the payments they have received.
+MATCH (n:NRA)-[:RECIEVES]->(p:Payment)
+RETURN n.id AS NRA_ID, n.first_name AS FirstName, n.last_name AS LastName, 
+       p.id AS PaymentID, p.gross_pay AS GrossPay, p.net_pay AS NetPay
+
+
+// Q2: List all the departments and their department admins.
+MATCH (d:Department)<-[:SUPERVISES]-(a:Dept_Admin)
+RETURN d.id AS DepartmentID, d.name AS DepartmentName, 
+       a.id AS AdminID, a.name AS AdminName
+
+
+// Q3: How many non-resident aliens are from a India?
+MATCH (n:NRA)
+WHERE n.nationality = 'Indian' 
+RETURN COUNT(n) AS NumberOfNRAs
+
+
+// Q4: Calculate the total gross pay processed by each department.
+MATCH (n:NRA)-[:PART_OF]->(d:Department)
+MATCH (n)-[:RECIEVES]->(p:Payment)
+RETURN d.id AS DepartmentID, d.name AS DepartmentName, 
+       SUM(p.gross_pay) AS TotalGrossPay
+
+
+// Q5: Which department processes the highest number of payments?
+MATCH (n:NRA)-[:PART_OF]->(d:Department)
+MATCH (n)-[:RECIEVES]->(p:Payment)
+RETURN d.id AS DepartmentID, d.name AS DepartmentName, 
+COUNT(p) AS PaymentCount
+ORDER BY PaymentCount DESC
+LIMIT 1
+
+
+// Q6: Find non-resident aliens who have received payments greater than $3000.
+MATCH (n:NRA)-[:RECIEVES]->(p:Payment)
+WHERE p.gross_pay > 3000
+RETURN n.id AS NRA_ID, n.first_name AS FirstName, n.last_name AS LastName, 
+       p.id AS PaymentID, p.gross_pay AS GrossPay
+
+
+// Q7: What payments were approved by a HR Department, and which non-resident aliens received them?(name of the admin, dept and NRA)?
+MATCH (a:Dept_Admin)-[:SUPERVISES]->(d:Department)
+MATCH (a)-[:APPROVES]->(p:Payment)<-[:RECIEVES]-(n:NRA)
+WHERE d.id = '1' RETURN d.name AS DepartmentName, 
+       a.name AS AdminName, 
+       n.first_name AS NRAFirstName, n.last_name AS NRALastName, 
+       p.id AS PaymentID, p.gross_pay AS GrossPay
+
+
+
+
+
